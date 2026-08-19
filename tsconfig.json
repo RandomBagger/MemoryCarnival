@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "es2015",
+    "moduleResolution": "bundler",
+    "outDir": "static/js",
+    "rootDir": "static/ts",
+    "strict": true,
+    "noImplicitAny": true,
+    "sourceMap": false
+  },
+  "include": ["static/ts/**/*.ts"]
+}
