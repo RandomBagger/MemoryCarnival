@@ -1,0 +1,782 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap');
+
+:root {
+  /* Palette */
+  --plum: #5d3140;
+  --pink: #cf4173;
+  --rose: #f39399;
+  --cream: #f6d8bd;
+  --wine: #8c1f3a;
+  --good: #3fa06b;
+
+  /* Backdrop behind media, on the stage and on every card. Transparent sprites
+     sit on this rather than on flat white. */
+  --sprite-bg: linear-gradient(155deg, #35143a 0%, #5d2350 42%, #cf4173 100%);
+
+  /* Timing knobs — single source of truth. JS reads these live from computed
+     style, so editing them in devtools retunes CSS and JS together, no reload.
+     See DESIGN.md section 5. */
+  --dur-show: 950ms;
+  --dur-gap: 300ms;
+  --dur-media-fade: 220ms;
+  --dur-banner: 1000ms;
+  --dur-reveal-delay: 900ms;
+  --dur-win-hold: 1400ms;
+  --dur-lose-fade: 1100ms;
+  --dur-lose-hold: 1300ms;
+  --dur-confetti: 1600ms;
+  --dur-start-fade: 180ms;
+  --dur-start-expand: 550ms;
+  --dur-view-in: 260ms;
+
+  --ease-expand: cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden; /* no vertical scroll, ever */
+}
+
+body {
+  margin: 0;
+  font-family: 'Baloo 2', 'Comic Sans MS', cursive, sans-serif;
+  background: repeating-linear-gradient(45deg, var(--pink) 0 40px, var(--rose) 40px 80px);
+  color: var(--plum);
+  transition: filter var(--dur-lose-fade) ease;
+}
+
+/* Losing drains the colour out of the entire page, background included. */
+body.losing {
+  filter: grayscale(1) brightness(0.62);
+}
+
+/* ---------------------------------------------------------------- *
+ * Layout: fixed full-viewport column. Marquee and leaderboard
+ * collapse away when body gets .playing; the shell expands to fill.
+ * ---------------------------------------------------------------- */
+
+.stage-wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+}
+
+.marquee {
+  text-align: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+  transition:
+    opacity var(--dur-start-expand) ease,
+    max-height var(--dur-start-expand) var(--ease-expand),
+    margin var(--dur-start-expand) var(--ease-expand);
+  max-height: 200px;
+}
+.marquee h1 {
+  font-size: clamp(1.8rem, 5.5vw, 3.1rem);
+  font-weight: 800;
+  color: var(--cream);
+  text-shadow: 3px 3px 0 var(--plum), -1px -1px 0 var(--wine);
+  margin: 0;
+  letter-spacing: 1px;
+}
+.tagline {
+  color: var(--plum);
+  font-weight: 700;
+  background: var(--cream);
+  display: inline-block;
+  padding: 4px 16px;
+  border-radius: 20px;
+  margin: 8px 0 0;
+  border: 3px dashed var(--plum);
+}
+
+.panel {
+  background: var(--cream);
+  border-radius: 22px;
+  border: 6px solid var(--plum);
+  box-shadow: 0 10px 0 rgba(93, 49, 64, 0.35);
+  text-align: center;
+}
+
+/* Fills all the height the marquee leaves behind. Panels stretch to match. */
+.columns {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  transition: gap var(--dur-start-expand) var(--ease-expand);
+}
+body.playing .columns { gap: 0; }
+
+.side-panel {
+  flex: 0 0 clamp(230px, 21vw, 380px);
+  min-width: 0;
+  padding: 20px 22px;
+  overflow: hidden;
+  text-align: left;
+  transition:
+    opacity var(--dur-start-expand) ease,
+    max-width var(--dur-start-expand) var(--ease-expand),
+    max-height var(--dur-start-expand) var(--ease-expand),
+    padding var(--dur-start-expand) var(--ease-expand),
+    border-width var(--dur-start-expand) var(--ease-expand);
+  max-width: 340px;
+}
+.side-panel h3 {
+  color: var(--pink);
+  font-size: 1.3rem;
+  margin: 0 0 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.side-text {
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+/* The shell takes whatever width the side panels leave, in both states — when
+   they collapse it simply grows into the space. No explicit height needed. */
+.shell {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 1180px;
+  padding: 24px;
+  overflow: hidden;
+  transition:
+    max-width var(--dur-start-expand) var(--ease-expand),
+    padding var(--dur-start-expand) var(--ease-expand);
+}
+
+/* Expanded / in-game state */
+body.playing .marquee {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+body.playing .side-panel {
+  opacity: 0;
+  flex-basis: 0;
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-width: 0;
+  pointer-events: none;
+}
+body.playing .shell {
+  max-width: 100%;
+  padding: 18px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Views inside the shell
+ * ---------------------------------------------------------------- */
+
+.view {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+.view:not(.hidden) {
+  display: flex;
+  animation: view-fade-in var(--dur-view-in) ease both;
+}
+.view-center {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.view-game { gap: 12px; }
+
+.hidden { display: none; }
+
+@keyframes view-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.start-leaving { animation: view-fade-out var(--dur-start-fade) ease both; }
+@keyframes view-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; transform: scale(0.96); }
+}
+
+.hype {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--plum);
+  margin: 0 0 14px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Controls
+ * ---------------------------------------------------------------- */
+
+.btn {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 1.1rem;
+  padding: 14px 30px;
+  border-radius: 40px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  box-shadow: 0 6px 0 rgba(93, 49, 64, 0.45);
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(93, 49, 64, 0.45); }
+.btn-primary { background: var(--pink); color: var(--cream); }
+.btn-secondary { background: var(--plum); color: var(--cream); }
+
+.btn-row { display: flex; gap: 14px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+
+.hud {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.badge {
+  background: var(--plum);
+  color: var(--cream);
+  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-size: 1.05rem;
+}
+.hud-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge-soft {
+  background: var(--rose);
+  color: var(--plum);
+}
+.status {
+  font-weight: 700;
+  color: var(--pink);
+  font-size: 1.05rem;
+}
+
+/* Telegraphs a difficulty step on the stage before playback starts. */
+.round-banner {
+  color: var(--cream);
+  font-weight: 800;
+  font-size: clamp(1.2rem, 3.5vw, 2.1rem);
+  text-align: center;
+  padding: 0 16px;
+  text-shadow: 3px 3px 0 var(--wine);
+  animation: banner-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes banner-pop {
+  from { opacity: 0; transform: scale(0.6) rotate(-4deg); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------------------------------------------------------------- *
+ * Play area — flexes to fill the expanded shell, never scrolls
+ * ---------------------------------------------------------------- */
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sprite-bg);
+  border-radius: 18px;
+  border: 4px solid var(--rose);
+  overflow: hidden;
+}
+.stage.flash { box-shadow: inset 0 0 0 6px var(--rose); }
+.stage img, .stage video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+}
+
+/* Sequence items fade (and nudge in scale) rather than hard-cutting. */
+.stage-media {
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity var(--dur-media-fade) ease,
+    transform var(--dur-media-fade) ease;
+}
+.stage-media.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 4x2 board of square cells.
+   Height is DERIVED from width via aspect-ratio (flex: 0 0 auto, so flex never
+   stretches it), and max-width caps the width so the derived height can't
+   outgrow the shell. Sizing in this direction is what stops cards overflowing
+   their cells: the old version fixed card height and let width spill. */
+.grid {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 100%;
+  max-width: min(100%, 118vh);
+  aspect-ratio: 2 / 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.grid-card {
+  position: relative;
+  /* Fills its cell exactly. The cells are already square (see .grid), so the
+     card is square without needing an aspect-ratio that could fight the cell
+     and overflow it. */
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 5px;
+  border-radius: 16px;
+  border: 4px solid var(--rose);
+  background: var(--sprite-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.grid-card:hover { transform: scale(1.04) rotate(-1deg); border-color: var(--pink); }
+.grid-card img, .grid-card video {
+  width: 100%;
+  height: 100%;
+  /* contain, not cover — cropping a sprite can hide the part that makes it
+     recognisable, which breaks the whole memory game. */
+  object-fit: contain;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.grid-card.selected {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 4px rgba(207, 65, 115, 0.45);
+}
+
+.badge-holder {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  z-index: 2;
+}
+.pick-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--plum);
+  color: var(--cream);
+  font-weight: 800;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 0 rgba(93, 49, 64, 0.4);
+  animation: badge-pop 0.2s ease;
+}
+.pick-badge.right { background: var(--good); }
+.pick-badge.wrong { background: var(--wine); }
+@keyframes badge-pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------- *
+ * Celebration
+ * ---------------------------------------------------------------- */
+
+/* Controls-less audio still generates an inline box in normal flow, which adds a
+   stray line's worth of height at the bottom of the page. */
+#bg-music { display: none; }
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 999;
+}
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 16px;
+  opacity: 0.95;
+  border-radius: 2px;
+  animation: confetti-fall var(--dur-confetti) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--drift), 100vh) rotate(var(--rot)); opacity: 0.3; }
+}
+
+/* ---------------------------------------------------------------- *
+ * Over screen + leaderboard
+ * ---------------------------------------------------------------- */
+
+#player-name {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 10px 16px;
+  border-radius: 30px;
+  border: 3px solid var(--plum);
+  margin-top: 10px;
+  width: min(100%, 300px);
+  text-align: center;
+  background: #fff;
+  color: var(--plum);
+}
+
+#leaderboard-list {
+  text-align: left;
+  margin: 0;
+  padding-left: 22px;
+  font-weight: 700;
+  color: var(--plum);
+}
+#leaderboard-list li { margin: 6px 0; }
+
+/* ---------------------------------------------------------------- *
+ * Mobile — one column, vertical scroll only. The mode is set once at
+ * load by game.ts (body.mobile); the board is 4 cards instead of 8.
+ * ---------------------------------------------------------------- */
+
+html:has(body.mobile) {
+  height: auto;
+  overflow-y: auto;
+}
+body.mobile {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden; /* never sideways */
+  overflow-y: auto;
+}
+
+body.mobile .stage-wrap {
+  position: static;
+  /* dvh, not vh: on mobile browsers vh includes the area behind the URL bar,
+     so a 100vh layout is taller than what you can actually see. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 12px;
+  gap: 12px;
+}
+
+body.mobile .columns {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+}
+body.mobile .shell {
+  order: -1; /* the game comes first; about and scores read below it */
+  max-width: none;
+  width: 100%;
+  /* Hugs its content when idle — the start and over views are short, and a
+     fixed height just leaves a wall of empty cream. Play fills via flex below. */
+  min-height: 0;
+  padding: clamp(12px, 4vw, 22px);
+}
+body.mobile .side-panel {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
+  max-height: 70vh;
+}
+body.mobile .side-panel h3 { white-space: normal; }
+
+/* 4 cards, 2x2. Square board, so the width cap is ~half of the desktop one —
+   this is what keeps the board inside the screen on a tall phone. */
+body.mobile .grid {
+  aspect-ratio: 1 / 1;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  max-width: min(100%, 46dvh);
+  gap: 10px;
+}
+body.mobile .grid-card { border-width: 3px; border-radius: 14px; }
+
+/* Playing: side panels fold away vertically and the page stops scrolling. */
+/* Playing: the page is exactly the viewport. Nothing to scroll, and no slab of
+   background under the board — the stage soaks up whatever height is spare. */
+html:has(body.mobile.playing) {
+  height: 100dvh;
+  overflow: hidden;
+}
+body.mobile.playing {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+body.mobile.playing .shell {
+  flex: 1 1 auto;
+  padding: clamp(10px, 3vw, 16px);
+}
+body.mobile .view-game { gap: 8px; }
+
+/* Fixed height, not flex-grow: the shell hugs its content on mobile, so a
+   growing stage would have nothing to grow into and would collapse instead. */
+body.mobile .stage {
+  flex: 0 0 auto;
+  height: 26dvh;
+  border-width: 3px;
+  border-radius: 14px;
+}
+
+/* Landscape phone: not enough height for the normal split. */
+@media (max-height: 430px) {
+  body.mobile .stage { height: 20dvh; }
+  body.mobile .grid { max-width: min(100%, 40dvh); }
+  body.mobile .hud { padding-right: clamp(40px, 8vw, 52px); }
+}
+
+/* Keep the HUD clear of the settings gear pinned in the corner. */
+body.mobile .hud { padding-right: clamp(44px, 13vw, 58px); }
+body.mobile .settings-btn { top: 8px; right: 8px; }
+/* Shell hugs the play content, and the wrap hugs the shell — no forced 100dvh,
+   no centring slack, no leftover gap where the collapsed marquee used to be. */
+body.mobile.playing .stage-wrap {
+  height: 100dvh;
+  min-height: 0;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 8px;
+}
+body.mobile.playing .columns {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+body.mobile.playing .shell { min-height: 0; }
+body.mobile.playing .view-game { height: 100%; }
+
+/* The board keeps its size (fixed by aspect-ratio + max-width); the stage takes
+   everything left over, so the shell ends exactly at the bottom of the screen. */
+body.mobile.playing .stage {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* Controls and type scale with viewport width. Mobile only — desktop keeps its
+   fixed sizes. */
+body.mobile .panel {
+  border-width: 4px;
+  border-radius: 16px;
+  box-shadow: 0 6px 0 rgba(93, 49, 64, 0.35);
+}
+body.mobile .marquee h1 { font-size: clamp(1.3rem, 6.5vw, 2.1rem); }
+body.mobile .tagline {
+  font-size: clamp(0.68rem, 3.2vw, 0.9rem);
+  padding: 3px 12px;
+  border-width: 2px;
+}
+
+body.mobile .btn {
+  font-size: clamp(0.8rem, 3.8vw, 1.05rem);
+  padding: clamp(8px, 2.8vw, 13px) clamp(16px, 6vw, 28px);
+  box-shadow: 0 4px 0 rgba(93, 49, 64, 0.45);
+}
+body.mobile .btn:active { box-shadow: 0 1px 0 rgba(93, 49, 64, 0.45); }
+body.mobile .btn-row { gap: 8px; margin-top: 10px; }
+
+body.mobile #player-name {
+  font-size: clamp(0.85rem, 3.6vw, 1rem);
+  padding: clamp(7px, 2.4vw, 10px) 14px;
+  width: min(100%, 260px);
+  border-width: 2px;
+  margin-top: 6px;
+}
+
+body.mobile .view-center { gap: 2px; }
+body.mobile .view-center h2 {
+  font-size: clamp(1.05rem, 5vw, 1.6rem);
+  margin: 0 0 4px;
+}
+body.mobile .view-center p {
+  font-size: clamp(0.85rem, 3.6vw, 1rem);
+  margin: 4px 0;
+}
+body.mobile .hype {
+  font-size: clamp(0.95rem, 4.2vw, 1.25rem);
+  margin: 0 0 10px;
+}
+
+body.mobile .hud { gap: 6px; }
+body.mobile .badge {
+  font-size: clamp(0.72rem, 3.2vw, 1rem);
+  padding: 6px 12px;
+}
+body.mobile .status { font-size: clamp(0.72rem, 3.2vw, 1rem); }
+body.mobile .pick-badge {
+  width: clamp(16px, 5vw, 22px);
+  height: clamp(16px, 5vw, 22px);
+  font-size: clamp(0.6rem, 2.6vw, 0.75rem);
+}
+
+body.mobile .side-panel { padding: clamp(12px, 4vw, 18px); }
+body.mobile .side-panel h3 { font-size: clamp(1rem, 4.4vw, 1.3rem); }
+body.mobile .side-text,
+body.mobile #leaderboard-list {
+  font-size: clamp(0.82rem, 3.5vw, 0.95rem);
+}
+
+body.mobile .settings-btn {
+  top: 10px;
+  right: 10px;
+  width: clamp(38px, 11vw, 48px);
+  height: clamp(38px, 11vw, 48px);
+  font-size: clamp(1.1rem, 5vw, 1.5rem);
+  border-width: 3px;
+}
+body.mobile .settings-panel {
+  top: clamp(54px, 15vw, 68px);
+  padding: 14px 16px;
+}
+body.mobile.playing .side-panel {
+  max-width: none;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * Settings
+ * ---------------------------------------------------------------- */
+
+.settings-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1001;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  /* Flex-centre the glyph: a button's default text baseline leaves the emoji
+     sitting high and slightly left inside a circle. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  border-radius: 50%;
+  border: 4px solid var(--plum);
+  background: var(--cream);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(93, 49, 64, 0.4);
+  transition: transform 0.25s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent; /* kills the grey blob on tap */
+  user-select: none;
+  outline: none;
+}
+.settings-btn:hover { transform: rotate(60deg); }
+/* Rotation has to be repeated here or pressing it snaps the gear back upright. */
+.settings-btn:active {
+  transform: rotate(60deg) translateY(3px);
+  box-shadow: 0 1px 0 rgba(93, 49, 64, 0.4);
+}
+.settings-btn:focus-visible {
+  box-shadow: 0 4px 0 rgba(93, 49, 64, 0.4), 0 0 0 4px var(--rose);
+}
+/* Open state: hold the turned position so the button reads as "on". */
+.settings-btn[aria-expanded="true"] { transform: rotate(90deg); }
+.settings-btn[aria-expanded="true"]:active { transform: rotate(90deg) translateY(3px); }
+
+.settings-panel {
+  position: fixed;
+  top: 72px;
+  right: 14px;
+  z-index: 1000;
+  width: min(92vw, 300px);
+  padding: 18px 20px;
+  text-align: left;
+  background: var(--cream);
+  border: 5px solid var(--plum);
+  border-radius: 18px;
+  box-shadow: 0 8px 0 rgba(93, 49, 64, 0.35);
+  animation: panel-drop 0.2s ease both;
+}
+@keyframes panel-drop {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.settings-panel h3 {
+  margin: 0 0 12px;
+  color: var(--pink);
+  font-size: 1.25rem;
+  text-align: center;
+}
+.setting-label {
+  display: block;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--plum);
+  margin: 10px 0 5px;
+}
+.setting-select,
+.setting-range {
+  width: 100%;
+  font-family: inherit;
+}
+.setting-select {
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 3px solid var(--plum);
+  background: #fff;
+  color: var(--plum);
+  cursor: pointer;
+}
+.setting-range { accent-color: var(--pink); cursor: pointer; }
+.setting-note {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--wine);
+}
+.setting-note code {
+  background: rgba(93, 49, 64, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Debug harness
+ * ---------------------------------------------------------------- */
+
+.debug-hint {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 998;
+  background: rgba(93, 49, 64, 0.88);
+  color: var(--cream);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--rose);
+  pointer-events: none;
+  white-space: pre;
+}
