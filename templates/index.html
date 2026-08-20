@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎪 Memory Carnival</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div id="confetti-layer" class="confetti-layer"></div>
+
+  <button id="settings-btn" class="settings-btn" type="button"
+          aria-label="Settings" aria-expanded="false">⚙️</button>
+
+  <div id="settings-panel" class="settings-panel hidden">
+    <h3>⚙️ Settings</h3>
+
+    <label class="setting-label" for="music-select">Background music</label>
+    <select id="music-select" class="setting-select">
+      <option value="">🔇 None</option>
+    </select>
+
+    <label class="setting-label" for="music-volume">Volume</label>
+    <input id="music-volume" class="setting-range" type="range"
+           min="0" max="100" step="1" value="50" />
+
+    <p id="music-empty" class="setting-note hidden">
+      Drop audio files into <code>assets/music/</code> to fill this list.
+    </p>
+  </div>
+
+  <audio id="bg-music" loop></audio>
+
+  <div class="stage-wrap">
+    <header id="marquee" class="marquee">
+      <h1>🎪 Memory Carnival 🎡</h1>
+      <p class="tagline">Step right up! Watch. Remember. Click!</p>
+    </header>
+
+    <div class="columns">
+    <!-- Side columns show on the start and over screens only; they collapse
+         away horizontally while playing. -->
+    <!-- Copy comes from /api/settings; edit it at /admin. -->
+    <aside id="about-panel" class="panel side-panel">
+      <h3 id="about-title">🎠 About</h3>
+      <div id="about-body"></div>
+    </aside>
+
+    <!-- One shell panel holds every view. Clicking Start expands this same box
+         to fill the viewport instead of swapping to a different panel. -->
+    <section id="shell" class="panel shell">
+      <div id="start-view" class="view view-center">
+        <p class="hype">Can you out-remember the ringmaster?</p>
+        <button id="start-btn" class="btn btn-primary">🎟️ Start Game</button>
+      </div>
+
+      <div id="game-view" class="view view-game hidden">
+        <div class="hud">
+          <div class="hud-badges">
+            <div class="badge">Round <span id="round-label">0</span></div>
+            <div class="badge badge-soft">Cards <span id="cards-label">1</span></div>
+          </div>
+          <div id="status-label" class="status">Get ready...</div>
+        </div>
+        <div id="stage" class="stage"></div>
+        <div id="grid" class="grid"></div>
+      </div>
+
+      <div id="over-view" class="view view-center hidden">
+        <h2>🎊 Show's Over! 🎊</h2>
+        <p>You reached round <span id="final-round">0</span></p>
+        <input id="player-name" type="text" maxlength="30" placeholder="Your carnival name" />
+        <div class="btn-row">
+          <button id="save-score-btn" class="btn btn-primary">💾 Save Score</button>
+          <button id="play-again-btn" class="btn btn-secondary">🎪 Play Again</button>
+        </div>
+      </div>
+    </section>
+
+    <aside id="leaderboard-panel" class="panel side-panel leaderboard">
+      <h3>🏆 High Rollers</h3>
+      <ol id="leaderboard-list"></ol>
+    </aside>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
