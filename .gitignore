@@ -1,0 +1,29 @@
+# Secrets — see .env.example for the shape
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# SQLite database (scores + settings live here; the app creates it on start)
+game.db
+game.db-journal
+
+# Uploaded media. Content, not code — managed through /admin, which recreates
+# the folders on first upload, so a clone starts empty and fills itself.
+assets/
+
+# TypeScript tooling — static/js/*.js IS committed, it is what the app serves
+node_modules/
+*.tsbuildinfo
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -81,6 +81,7 @@ html:has(.admin-body) {
 }
 
 .dropzone {
+  position: relative; /* anchors .busy-overlay */
   display: block; /* it's a <label>, which is inline by default */
   margin: 12px 0 16px;
   padding: 16px;
@@ -98,6 +99,42 @@ html:has(.admin-body) {
   border-color: var(--pink);
 }
 .dropzone input { display: none; }
+
+/* Upload in flight: the zone stops taking clicks so the same files can't be
+   dropped twice while the first request is still running. */
+.dropzone.busy {
+  pointer-events: none;
+  border-style: solid;
+  border-color: var(--pink);
+}
+.busy-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: rgba(246, 216, 189, 0.92);
+}
+.busy-text { color: var(--plum); font-weight: 700; }
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid rgba(93, 49, 64, 0.25);
+  border-top-color: var(--pink);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
 
 .asset-grid {
   display: grid;

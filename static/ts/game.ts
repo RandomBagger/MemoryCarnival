@@ -180,6 +180,147 @@ function randomSequence(length: number): MediaItem[] {
   return out;
 }
 
+/* ------------------------------------------------------------------ *
+ * Asset preloading
+ *
+ * The host serves assets/ off spinning disk with no CDN, so a cold file can
+ * take a second or more to arrive. Playing a round against that means the
+ * stage flashes an empty box where an act should be — the player loses the
+ * round to the network, not to their memory.
+ *
+ * So: nothing is shown until its bytes are in the browser cache, and the next
+ * round's board is fetched in the background while the player is still picking
+ * the current one. A cache entry holds a live element per item, which is what
+ * actually keeps the decoded asset resident; dropping it is what frees memory.
+ * ------------------------------------------------------------------ */
+
+/** Give up waiting on a single asset after this and show it anyway. */
+const PRELOAD_TIMEOUT_MS = 8000;
+/** Only show the spinner if the wait is long enough to notice — no flicker on cache hits. */
+const SPINNER_DELAY_MS = 180;
+/** Items untouched for this many rounds are dropped from the cache. */
+const CACHE_KEEP_ROUNDS = 3;
+
+interface CacheEntry {
+  /** Kept referenced purely so the browser holds on to the decoded asset. */
+  el: HTMLImageElement | HTMLVideoElement;
+  ready: Promise<void>;
+  /** Last round this item appeared on a board — drives eviction. */
+  lastRound: number;
+}
+
+const assetCache = new Map<string, CacheEntry>();
+
+/** Resolves when `p` settles or `ms` elapses, whichever comes first. Never rejects. */
+function withTimeout(p: Promise<unknown>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    void p.then(
+      () => { clearTimeout(timer); resolve(); },
+      () => { clearTimeout(timer); resolve(); },
+    );
+  });
+}
+
+/** Starts fetching one item. A broken asset resolves too — it must not wedge the round. */
+function fetchItem(item: MediaItem): CacheEntry {
+  if (item.type === "video") {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = item.url;
+    const ready = new Promise<void>((resolve) => {
+      if (video.readyState >= 3) return resolve();
+      video.addEventListener("canplaythrough", () => resolve(), { once: true });
+      video.addEventListener("error", () => resolve(), { once: true });
+    });
+    video.load();
+    return { el: video, ready, lastRound: round };
+  }
+
+  const img = new Image();
+  img.src = item.url;
+  // decode() waits for the pixels, not just the bytes, so the first paint of a
+  // big JPEG doesn't stall the fade-in. Older browsers fall back to onload.
+  const ready: Promise<void> = img.decode
+    ? img.decode().catch(() => undefined)
+    : new Promise<void>((resolve) => {
+        if (img.complete) return resolve();
+        img.addEventListener("load", () => resolve(), { once: true });
+        img.addEventListener("error", () => resolve(), { once: true });
+      });
+  return { el: img, ready, lastRound: round };
+}
+
+/** Warms the cache for `items` without waiting. Returns the entries touched. */
+function prefetch(items: MediaItem[], atRound: number): CacheEntry[] {
+  return items.map((item) => {
+    let entry = assetCache.get(item.id);
+    if (!entry) {
+      entry = fetchItem(item);
+      assetCache.set(item.id, entry);
+    }
+    entry.lastRound = Math.max(entry.lastRound, atRound);
+    return entry;
+  });
+}
+
+/** Frees anything that hasn't been on a board for CACHE_KEEP_ROUNDS rounds. */
+function evictStale(atRound: number): void {
+  const cutoff = atRound - CACHE_KEEP_ROUNDS;
+  assetCache.forEach((entry, id) => {
+    if (entry.lastRound > cutoff) return;
+    if (entry.el instanceof HTMLVideoElement) {
+      entry.el.pause();
+      entry.el.removeAttribute("src");
+      entry.el.load(); // actually releases the buffered data
+    } else {
+      entry.el.removeAttribute("src");
+    }
+    assetCache.delete(id);
+  });
+}
+
+let stageLoader: HTMLDivElement | null = null;
+
+function showStageLoader(text: string): void {
+  if (!stageLoader) {
+    stageLoader = document.createElement("div");
+    stageLoader.className = "stage-loader";
+    const ring = document.createElement("span");
+    ring.className = "spinner";
+    const label = document.createElement("span");
+    label.className = "stage-loader-text";
+    stageLoader.append(ring, label);
+  }
+  (stageLoader.lastChild as HTMLSpanElement).textContent = text;
+  if (stageLoader.parentElement !== stage) stage.appendChild(stageLoader);
+}
+
+function hideStageLoader(): void {
+  stageLoader?.remove();
+}
+
+/**
+ * Blocks until every item is cached (or timed out), showing a spinner if the
+ * wait is long enough to be visible.
+ */
+async function waitForAssets(items: MediaItem[], atRound: number, text: string): Promise<void> {
+  const entries = prefetch(items, atRound);
+  if (entries.length === 0) return;
+
+  let done = false;
+  const all = Promise.all(entries.map((e) => e.ready)).then(() => { done = true; });
+
+  await Promise.race([all, sleep(SPINNER_DELAY_MS)]);
+  if (done) return;
+
+  showStageLoader(text);
+  await withTimeout(all, PRELOAD_TIMEOUT_MS);
+  hideStageLoader();
+}
+
 interface PickedCard {
   item: MediaItem;
   card: HTMLButtonElement;
@@ -195,6 +336,8 @@ interface CardRef {
 let pool: MediaItem[] = [];
 /** This round's 8 cards. Rebuilt every round by pickBoard() for the freshness rule. */
 let board: MediaItem[] = [];
+/** Next round's board, picked early so it can be preloaded while the player picks. */
+let nextBoard: MediaItem[] | null = null;
 let sequence: MediaItem[] = [];
 let round = 0;
 /** Highest round cleared this run. Setbacks must not lower the score. */
@@ -286,7 +429,9 @@ async function startRound(): Promise<void> {
   accepting = false;
   skipPlayback = false;
 
-  board = pickBoard(round);
+  // A board prefetched last round is already in flight (or done); otherwise pick now.
+  board = nextBoard ?? pickBoard(round);
+  nextBoard = null;
   const fresh = boardIsFresh(board);
   statusLabel.textContent = fresh ? "Watch closely — all new acts!" : "Watch closely!";
 
@@ -295,6 +440,11 @@ async function startRound(): Promise<void> {
 
   await announceStep(round);
   justSetBack = false;
+
+  // Nothing goes on stage until it is actually in the browser — a half-loaded
+  // act would burn its show time on a blank box.
+  await waitForAssets(board, round, "Loading the next act…");
+  evictStale(round);
 
   // Only what actually goes on stage counts as "seen".
   sequence.forEach((item) => seenIds.add(item.id));
@@ -324,6 +474,12 @@ async function startRound(): Promise<void> {
   skipPlayback = false;
   statusLabel.textContent = `Pick all ${sequence.length} in order.`;
   accepting = true;
+
+  // Picked here, after seenIds has taken this round's items, so the freshness
+  // rule sees the same state it would have next round. Downloads run while the
+  // player thinks, which is the whole point.
+  nextBoard = pickBoard(round + 1);
+  prefetch(nextBoard, round + 1);
 }
 
 function buildGrid(items: MediaItem[]): void {
@@ -406,6 +562,7 @@ async function setbackRound(): Promise<void> {
   await sleep(TIMING.banner);
 
   justSetBack = true;
+  nextBoard = null; // picked for a round the run is no longer heading into
   round = target - 1; // startRound() adds the one back
   await startRound();
 }
@@ -473,11 +630,15 @@ async function loadLeaderboard(): Promise<void> {
 
 function newGame(): void {
   board = shuffle(pool).slice(0, GRID_SIZE);
+  nextBoard = null;
   sequence = [];
   round = 0;
   bestRound = 0;
   seenIds = new Set<string>();
   justSetBack = false;
+  // Keep whatever is already downloaded, but re-base its age on the new run's
+  // round counter or nothing would ever evict again.
+  assetCache.forEach((entry) => (entry.lastRound = 0));
 }
 
 async function resetGame(): Promise<void> {
@@ -494,7 +655,14 @@ async function resetGame(): Promise<void> {
 startBtn.addEventListener("click", async () => {
   playMusicIfChosen(); // this click is the gesture that unblocks autoplay
   if (pool.length === 0) {
+    const label = startBtn.textContent;
+    startBtn.disabled = true;
+    startBtn.classList.add("btn-busy");
+    startBtn.textContent = "Loading…";
     await loadMedia();
+    startBtn.classList.remove("btn-busy");
+    startBtn.disabled = false;
+    startBtn.textContent = label;
   }
   await expandIntoGame();
   if (pool.length < GRID_SIZE) {
@@ -667,6 +835,7 @@ async function debugNextRound(step = 1): Promise<void> {
   skipPlayback = true;
   await sleep(80);
   accepting = false;
+  if (step !== 1) nextBoard = null; // jumped past the round it was picked for
   round += step - 1; // startRound adds the last one
   await startRound();
 }
@@ -677,7 +846,9 @@ function debugReset(): void {
   document.body.classList.remove("playing", "losing");
   startView.classList.remove("hidden", "start-leaving");
   grid.innerHTML = "";
+  hideStageLoader();
   stage.innerHTML = "";
+  nextBoard = null;
   cardRefs = [];
   selections = [];
   accepting = false;

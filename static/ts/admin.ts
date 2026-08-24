@@ -105,7 +105,29 @@
     if (e.key === "Escape") closePreview();
   });
 
-  async function upload(folder: string, files: FileList | File[]): Promise<void> {
+  /**
+   * Covers a dropzone with a spinner for the length of an upload. Uploads can
+   * run for a while on a slow link, and a zone that just sits there looks
+   * broken — worse, it invites a second drop of the same files.
+   */
+  function busyOverlay(host: HTMLElement, text: string): () => void {
+    const overlay = document.createElement("div");
+    overlay.className = "busy-overlay";
+    const ring = document.createElement("span");
+    ring.className = "spinner";
+    const label = document.createElement("span");
+    label.className = "busy-text";
+    label.textContent = text;
+    overlay.append(ring, label);
+    host.classList.add("busy");
+    host.appendChild(overlay);
+    return () => {
+      overlay.remove();
+      host.classList.remove("busy");
+    };
+  }
+
+  async function upload(folder: string, files: FileList | File[], zone?: HTMLElement): Promise<void> {
     const list = Array.from(files);
     if (list.length === 0) return;
 
@@ -113,7 +135,18 @@
     list.forEach((f) => form.append("files", f));
 
     setStatus(`Uploading ${list.length} file(s) to ${folder}…`);
-    const res = await fetch(`/api/assets/${folder}`, { method: "POST", body: form });
+    const clear = zone ? busyOverlay(zone, `Uploading ${list.length} file(s)…`) : () => undefined;
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/assets/${folder}`, { method: "POST", body: form });
+    } catch {
+      clear();
+      setStatus("Upload failed — the connection dropped.");
+      return;
+    }
+    clear();
+
     if (!res.ok) {
       setStatus(`Upload failed (${res.status}).`);
       return;
@@ -231,7 +264,7 @@
     input.multiple = true;
     input.accept = data.accept.join(",");
     input.addEventListener("change", () => {
-      if (input.files) void upload(folder, input.files);
+      if (input.files) void upload(folder, input.files, zone);
       input.value = "";
     });
     zone.appendChild(input);
@@ -250,7 +283,7 @@
     );
     zone.addEventListener("drop", (e) => {
       const dt = (e as DragEvent).dataTransfer;
-      if (dt?.files) void upload(folder, dt.files);
+      if (dt?.files) void upload(folder, dt.files, zone);
     });
     card.appendChild(zone);
 

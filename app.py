@@ -1,11 +1,26 @@
+import functools
+import hmac
 import os
 import sqlite3
-from flask import Flask, g, jsonify, request, render_template, send_from_directory
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    Response,
+    g,
+    jsonify,
+    request,
+    render_template,
+    send_from_directory,
+)
 from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 DB_PATH = os.path.join(BASE_DIR, "game.db")
+
+# Secrets live in .env next to this file (never committed — see .env.example).
+# A real environment variable set by the host wins over the file.
+load_dotenv(os.path.join(BASE_DIR, ".env"), override=False)
 
 MEDIA_KINDS = {
     "images": {"exts": (".png", ".jpg", ".jpeg", ".webp", ".svg"), "type": "image"},
@@ -75,22 +90,26 @@ SETTINGS_SCHEMA = """
     )
 """
 
+SCORES_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_name TEXT NOT NULL,
+        round_reached INTEGER NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+"""
+
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            player_name TEXT NOT NULL,
-            round_reached INTEGER NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
+    conn.execute(SCORES_SCHEMA)
     conn.execute(SETTINGS_SCHEMA)
     conn.commit()
     conn.close()
+
+
+# Run at import so the WSGI server (which never executes __main__) gets the schema.
+init_db()
 
 
 @app.route("/")
@@ -145,12 +164,58 @@ def api_music():
     return jsonify(tracks)
 
 
+# ---------------------------------------------------------------------------
+# Admin gate — single shared password over HTTP Basic.
+#
+# The password comes from MC_ADMIN_PASSWORD (see .env.example); there is no
+# default, so a deployment that forgets to set one serves 503 on every admin
+# route rather than quietly accepting a known password.
+#
+# Still deliberately minimal: no accounts, no rate limiting, no lockout, no
+# logout. The credential rides along on every admin request, so it is only as
+# private as the transport — fine on PythonAnywhere's HTTPS, not over plain HTTP.
+# ---------------------------------------------------------------------------
+ADMIN_USER = os.environ.get("MC_ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("MC_ADMIN_PASSWORD", "")
+
+if not ADMIN_PASSWORD:
+    app.logger.warning("MC_ADMIN_PASSWORD is not set — /admin is disabled.")
+
+
+def require_admin(view):
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if not ADMIN_PASSWORD:
+            return Response("Admin is not configured on this server.", 503)
+
+        auth = request.authorization
+        ok = (
+            auth is not None
+            and auth.type == "basic"
+            # compare_digest, not ==, so neither check leaks its secret one
+            # character at a time through its own timing.
+            and hmac.compare_digest(auth.username or "", ADMIN_USER)
+            and hmac.compare_digest(auth.password or "", ADMIN_PASSWORD)
+        )
+        if not ok:
+            return Response(
+                "Admin access only.",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Memory Carnival admin"'},
+            )
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 @app.route("/admin")
+@require_admin
 def admin():
     return render_template("admin.html")
 
 
 @app.route("/api/assets", methods=["GET"])
+@require_admin
 def api_assets():
     """Everything in assets/, grouped by folder, for the admin panel."""
     out = {}
@@ -180,6 +245,7 @@ def api_assets():
 
 
 @app.route("/api/assets/<folder>", methods=["POST"])
+@require_admin
 def upload_assets(folder):
     info = kind_info(folder)
     if info is None:
@@ -217,6 +283,7 @@ def upload_assets(folder):
 
 
 @app.route("/api/assets/<folder>/<path:filename>", methods=["DELETE"])
+@require_admin
 def delete_asset(folder, filename):
     target = safe_asset_path(folder, filename)
     if target is None or not os.path.isfile(target):
@@ -236,6 +303,7 @@ def get_settings():
 
 
 @app.route("/api/settings", methods=["POST"])
+@require_admin
 def post_settings():
     payload = request.get_json(force=True) or {}
     db = get_db()
@@ -277,5 +345,4 @@ def post_score():
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)

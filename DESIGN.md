@@ -236,6 +236,16 @@ so tracks can never leak into the game's media pool.
 
 `/admin` — manage everything in `assets/` without touching the filesystem by hand.
 
+**Auth.** HTTP Basic with one shared login, read from `.env` (`MC_ADMIN_USER`,
+`MC_ADMIN_PASSWORD` — see `.env.example`; `.env` is gitignored). There is no default
+password: unset means every admin route answers 503, so a deployment can fail to
+configure but never fall open. Gates `/admin`, `GET /api/assets`, uploads, deletes, and
+`POST /api/settings`. Everything the game itself reads — `/api/media`, `/api/music`,
+`GET /api/settings`, scores — stays open.
+
+Still minimal by choice: no accounts, no rate limit, no lockout, no logout, and the
+credential rides on every admin request, so it is only as private as the transport.
+
 One card per folder (images, sprites, gifs, videos, music). Each has a dropzone that
 doubles as a file picker, and a grid of tiles. Tiles render on `--sprite-bg` inside a
 square with `object-fit: contain`, i.e. the exact in-game card treatment, so the preview
@@ -343,6 +353,30 @@ Freshness is bounded by how many assets exist. Rough simulation over 40 rounds:
 
 The status line says "Watch closely — all new acts!" only when the board really is
 all-new, so the promise is never made falsely.
+
+## 10. Asset loading **[BUILT]**
+
+The host serves `assets/` off disk with no CDN, so a cold file can take a second or
+more. A sequence item that arrives late burns its show time on an empty stage — the
+player loses the round to the network, not to their memory. Three rules:
+
+- **Nothing shows until it is loaded.** `startRound()` waits for every card on the
+  board (images via `decode()`, video via `canplaythrough`) before playback starts.
+  A single asset is given 8s, then the round proceeds anyway — one broken file must
+  not wedge the run.
+- **The next round is fetched while you pick.** As soon as playback ends, the next
+  board is chosen and downloaded in the background. It is chosen *after* the current
+  round's items are marked seen, so the odd/even freshness rule (9.2) sees the state
+  it would have seen anyway. Setbacks and debug jumps discard it — it was picked for
+  a round the run is no longer heading into.
+- **Three rounds of memory.** Anything that hasn't been on a board for 3 rounds is
+  dropped from the cache and its element released. Long runs on a phone stay flat
+  instead of accumulating every asset ever shown.
+
+Waits shorter than 180ms show nothing — a spinner that flickers on a cache hit reads
+as jank. Past that a spinner covers the stage. `/admin` uploads get the same spinner
+over the dropzone, which also stops taking clicks so the same files can't be dropped
+twice mid-request.
 
 ## 8. Debug keys **[BUILT]**
 
