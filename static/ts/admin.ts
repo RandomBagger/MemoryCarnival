@@ -16,6 +16,20 @@
 
   type AssetMap = Record<string, FolderData>;
 
+  function fuzzyMatch(pattern: string, str: string): boolean {
+    pattern = pattern.toLowerCase();
+    str = str.toLowerCase();
+    let patternIdx = 0;
+    let strIdx = 0;
+    while (patternIdx < pattern.length && strIdx < str.length) {
+      if (pattern[patternIdx] === str[strIdx]) {
+        patternIdx++;
+      }
+      strIdx++;
+    }
+    return patternIdx === pattern.length;
+  }
+
   const FOLDER_LABELS: Record<string, string> = {
     images: "🖼️ Images",
     sprites: "🧚 Sprites",
@@ -479,6 +493,41 @@
     searchInput.className = "setting-textarea";
     searchInput.style.resize = "none";
     searchInput.style.boxSizing = "border-box";
+    
+    searchInput.addEventListener("input", (e) => {
+      const query = (e.target as HTMLInputElement).value.trim();
+      
+      const folders = foldersHost.querySelectorAll(".folder-card");
+      folders.forEach((folder) => {
+        const tiles = folder.querySelectorAll(".asset-tile");
+        let hasVisible = false;
+        
+        tiles.forEach((tile) => {
+          const nameNode = tile.querySelector(".asset-name");
+          if (!nameNode) return;
+          const name = nameNode.textContent || "";
+          if (!query || fuzzyMatch(query, name)) {
+            (tile as HTMLElement).style.display = "";
+            hasVisible = true;
+          } else {
+            (tile as HTMLElement).style.display = "none";
+          }
+        });
+        
+        if (query) {
+          if (hasVisible) {
+            folder.classList.remove("collapsed");
+            (folder as HTMLElement).style.display = "";
+          } else {
+            (folder as HTMLElement).style.display = "none";
+          }
+        } else {
+          (folder as HTMLElement).style.display = "";
+          folder.classList.add("collapsed");
+        }
+      });
+    });
+    
     searchCard.appendChild(searchInput);
     
     main.appendChild(searchCard);

@@ -2,6 +2,19 @@
 // Asset admin panel. Wrapped in an IIFE so its top-level names never collide
 // with game.ts — both compile as classic scripts sharing one global scope.
 (() => {
+    function fuzzyMatch(pattern, str) {
+        pattern = pattern.toLowerCase();
+        str = str.toLowerCase();
+        let patternIdx = 0;
+        let strIdx = 0;
+        while (patternIdx < pattern.length && strIdx < str.length) {
+            if (pattern[patternIdx] === str[strIdx]) {
+                patternIdx++;
+            }
+            strIdx++;
+        }
+        return patternIdx === pattern.length;
+    }
     const FOLDER_LABELS = {
         images: "🖼️ Images",
         sprites: "🧚 Sprites",
@@ -399,6 +412,40 @@
         searchInput.className = "setting-textarea";
         searchInput.style.resize = "none";
         searchInput.style.boxSizing = "border-box";
+        searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.trim();
+            const folders = foldersHost.querySelectorAll(".folder-card");
+            folders.forEach((folder) => {
+                const tiles = folder.querySelectorAll(".asset-tile");
+                let hasVisible = false;
+                tiles.forEach((tile) => {
+                    const nameNode = tile.querySelector(".asset-name");
+                    if (!nameNode)
+                        return;
+                    const name = nameNode.textContent || "";
+                    if (!query || fuzzyMatch(query, name)) {
+                        tile.style.display = "";
+                        hasVisible = true;
+                    }
+                    else {
+                        tile.style.display = "none";
+                    }
+                });
+                if (query) {
+                    if (hasVisible) {
+                        folder.classList.remove("collapsed");
+                        folder.style.display = "";
+                    }
+                    else {
+                        folder.style.display = "none";
+                    }
+                }
+                else {
+                    folder.style.display = "";
+                    folder.classList.add("collapsed");
+                }
+            });
+        });
         searchCard.appendChild(searchInput);
         main.appendChild(searchCard);
         main.appendChild(foldersHost);
