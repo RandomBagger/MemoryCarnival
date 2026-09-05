@@ -449,6 +449,28 @@
   void (async () => {
     main.innerHTML = "";
     main.appendChild(await buildAboutEditor());
+    
+    // Add non-functional search bar as requested
+    const searchCard = document.createElement("section");
+    searchCard.className = "folder-card";
+    
+    const searchHead = document.createElement("div");
+    searchHead.className = "folder-head";
+    const searchTitle = document.createElement("h2");
+    searchTitle.textContent = "🔍 Search assets";
+    searchHead.appendChild(searchTitle);
+    searchCard.appendChild(searchHead);
+    
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.placeholder = "Search for a file name...";
+    searchInput.className = "setting-textarea";
+    searchInput.style.resize = "none";
+    searchInput.style.boxSizing = "border-box";
+    searchCard.appendChild(searchInput);
+    
+    main.appendChild(searchCard);
+    
     main.appendChild(foldersHost);
     await render();
   })();

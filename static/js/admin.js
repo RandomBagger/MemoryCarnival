@@ -361,7 +361,7 @@
             total += data[folder].items.length;
             foldersHost.appendChild(buildFolder(folder, data[folder]));
         });
-        const playable = ["images", "sprites", "gifs", "videos"].reduce((n, f) => { var _a, _b; return n + ((_b = (_a = data[f]) === null || _a === void 0 ? void 0 : _a.items.length) !== null && _b !== void 0 ? _b : 0); }, 0);
+        const playable = ["images", "sprites", "gifs", "videos"].reduce((n, f) => { var _a; var _b; return n + ((_b = (_a = data[f]) === null || _a === void 0 ? void 0 : _a.items.length) !== null && _b !== void 0 ? _b : 0); }, 0);
         if (playable < 8) {
             const warn = document.createElement("p");
             warn.className = "admin-loading";
@@ -374,6 +374,23 @@
     void (async () => {
         main.innerHTML = "";
         main.appendChild(await buildAboutEditor());
+        // Add non-functional search bar as requested
+        const searchCard = document.createElement("section");
+        searchCard.className = "folder-card";
+        const searchHead = document.createElement("div");
+        searchHead.className = "folder-head";
+        const searchTitle = document.createElement("h2");
+        searchTitle.textContent = "🔍 Search assets";
+        searchHead.appendChild(searchTitle);
+        searchCard.appendChild(searchHead);
+        const searchInput = document.createElement("input");
+        searchInput.type = "search";
+        searchInput.placeholder = "Search for a file name...";
+        searchInput.className = "setting-textarea";
+        searchInput.style.resize = "none";
+        searchInput.style.boxSizing = "border-box";
+        searchCard.appendChild(searchInput);
+        main.appendChild(searchCard);
         main.appendChild(foldersHost);
         await render();
     })();
