@@ -133,27 +133,37 @@
         }
         catch (_a) {
             clear();
-            setStatus("Upload failed — the connection dropped.");
+            alert("Upload failed — the connection dropped.");
             return;
         }
         clear();
         if (!res.ok) {
-            setStatus(`Upload failed (${res.status}).`);
+            alert(`Upload failed (${res.status}).`);
             return;
         }
         const result = await res.json();
-        const parts = [];
-        if (result.saved.length)
-            parts.push(`Saved ${result.saved.length} to ${folder}.`);
-        result.rejected.forEach((r) => parts.push(`Rejected ${r.name} — ${r.reason}.`));
-        setStatus(parts.join(" ") || "Nothing uploaded.");
+        if (result.rejected.length > 0) {
+            const rejectMsg = result.rejected.map((r) => `Rejected ${r.name} — ${r.reason}.`).join("\n");
+            alert(rejectMsg);
+        }
+        if (result.saved.length) {
+            setStatus(`Saved ${result.saved.length} to ${folder}.`);
+        }
+        else if (result.rejected.length === 0) {
+            setStatus("Nothing uploaded.");
+        }
         await render();
     }
     async function remove(folder, name) {
         const res = await fetch(`/api/assets/${folder}/${encodeURIComponent(name)}`, {
             method: "DELETE",
         });
-        setStatus(res.ok ? `Deleted ${name}.` : `Could not delete ${name}.`);
+        if (res.ok) {
+            setStatus(`Deleted ${name}.`);
+        }
+        else {
+            alert(`Could not delete ${name}.`);
+        }
         await render();
     }
     function buildTile(folder, item) {
@@ -370,7 +380,12 @@
                 }),
             });
             saveBtn.disabled = false;
-            setStatus(save.ok ? "About text saved." : `Save failed (${save.status}).`);
+            if (save.ok) {
+                setStatus("About text saved.");
+            }
+            else {
+                alert(`Save failed (${save.status}).`);
+            }
         });
         card.appendChild(editor);
         return card;
