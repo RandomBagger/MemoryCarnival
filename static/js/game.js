@@ -16,7 +16,6 @@ const leaderboardList = document.getElementById("leaderboard-list");
 const confettiLayer = document.getElementById("confetti-layer");
 const shareBtn = document.getElementById("share-btn");
 const shareModal = document.getElementById("share-modal");
-const closeShareBtn = document.getElementById("close-share-btn");
 const sharePreviewImg = document.getElementById("share-preview-img");
 const downloadShareBtn = document.getElementById("download-share-btn");
 const settingsBtn = document.getElementById("settings-btn");
@@ -785,8 +784,10 @@ function installDebug() {
 }
 if (DEBUG)
     installDebug();
-closeShareBtn.addEventListener("click", () => {
-    shareModal.classList.add("hidden");
+shareModal.addEventListener("click", (e) => {
+    if (e.target === shareModal) {
+        shareModal.classList.add("hidden");
+    }
 });
 shareBtn.addEventListener("click", async () => {
     if (!lastWrongItem)

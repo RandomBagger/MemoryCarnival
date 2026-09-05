@@ -21,7 +21,6 @@ const leaderboardList = document.getElementById("leaderboard-list") as HTMLOList
 const confettiLayer = document.getElementById("confetti-layer") as HTMLDivElement;
 const shareBtn = document.getElementById("share-btn") as HTMLButtonElement;
 const shareModal = document.getElementById("share-modal") as HTMLDivElement;
-const closeShareBtn = document.getElementById("close-share-btn") as HTMLButtonElement;
 const sharePreviewImg = document.getElementById("share-preview-img") as HTMLImageElement;
 const downloadShareBtn = document.getElementById("download-share-btn") as HTMLAnchorElement;
 const settingsBtn = document.getElementById("settings-btn") as HTMLButtonElement;
@@ -904,8 +903,10 @@ function installDebug(): void {
 
 if (DEBUG) installDebug();
 
-closeShareBtn.addEventListener("click", () => {
-  shareModal.classList.add("hidden");
+shareModal.addEventListener("click", (e) => {
+  if (e.target === shareModal) {
+    shareModal.classList.add("hidden");
+  }
 });
 
 shareBtn.addEventListener("click", async () => {

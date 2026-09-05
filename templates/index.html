@@ -12,7 +12,7 @@
 <body>
   <div id="confetti-layer" class="confetti-layer"></div>
 
-  <button id="settings-btn" class="settings-btn" type="button"
+  <button id="settings-btn" class="settings-btn hidden" style="display: none;" type="button"
           aria-label="Settings" aria-expanded="false">⚙️</button>
 
   <div id="settings-panel" class="settings-panel hidden">
@@ -90,13 +90,24 @@
 
   <div id="share-modal" class="share-modal hidden">
     <div class="share-modal-content">
-      <button id="close-share-btn" class="close-share-btn" type="button" aria-label="Close">✖</button>
-      <h3>Share your score!</h3>
       <div id="share-preview-container">
         <img id="share-preview-img" alt="Share preview" />
       </div>
-      <p class="share-instructions">Long-press or right-click the image to save/copy it, or click the button below to download.</p>
-      <a id="download-share-btn" class="btn btn-primary" download="memory-carnival-score.png">Download Image</a>
+      <p class="share-instructions">Long-press or right-click the image to save/copy it, or use the buttons below.</p>
+      <div class="share-actions">
+        <a id="download-share-btn" class="btn btn-primary share-icon-btn" download="memory-carnival-score.png" title="Download">
+          <img src="{{ url_for('static', filename='icons/download.svg') }}" width="24" height="24" alt="Download" />
+        </a>
+        <button id="whatsapp-share-btn" class="btn btn-primary share-icon-btn" type="button" title="WhatsApp">
+          <img src="{{ url_for('static', filename='icons/whatsapp.svg') }}" width="24" height="24" alt="WhatsApp" />
+        </button>
+        <button id="insta-share-btn" class="btn btn-primary share-icon-btn" type="button" title="Instagram">
+          <img src="{{ url_for('static', filename='icons/instagram.svg') }}" width="24" height="24" alt="Instagram" />
+        </button>
+        <button id="other-share-btn" class="btn btn-primary share-icon-btn" type="button" title="More options">
+          <img src="{{ url_for('static', filename='icons/share.svg') }}" width="24" height="24" alt="Share" />
+        </button>
+      </div>
     </div>
   </div>
 
