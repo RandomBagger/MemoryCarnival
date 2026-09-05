@@ -147,6 +147,33 @@ html:has(.admin-body) {
   opacity: 0.8;
 }
 
+.folder-card.collapsed .asset-grid,
+.folder-card.collapsed .asset-empty {
+  display: none;
+}
+
+.collapse-btn {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--pink);
+  cursor: pointer;
+  margin-top: 16px;
+  margin-bottom: -8px;
+  padding: 4px;
+}
+.collapse-btn:hover {
+  color: var(--wine);
+}
+.collapse-btn svg {
+  transition: transform 0.2s ease;
+}
+.folder-card.collapsed .collapse-btn svg {
+  transform: rotate(180deg);
+}
+
 .asset-tile { display: flex; flex-direction: column; gap: 6px; }
 
 /* Mirrors .grid-card so the preview matches the in-game look exactly. */

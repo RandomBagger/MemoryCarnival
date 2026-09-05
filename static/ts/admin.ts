@@ -239,7 +239,7 @@
 
   function buildFolder(folder: string, data: FolderData): HTMLElement {
     const card = document.createElement("section");
-    card.className = "folder-card";
+    card.className = "folder-card collapsed";
 
     const head = document.createElement("div");
     head.className = "folder-head";
@@ -292,13 +292,25 @@
       empty.className = "asset-empty";
       empty.textContent = "Empty.";
       card.appendChild(empty);
-      return card;
+    } else {
+      const grid = document.createElement("div");
+      grid.className = "asset-grid";
+      data.items.forEach((item) => grid.appendChild(buildTile(folder, item)));
+      card.appendChild(grid);
     }
 
-    const grid = document.createElement("div");
-    grid.className = "asset-grid";
-    data.items.forEach((item) => grid.appendChild(buildTile(folder, item)));
-    card.appendChild(grid);
+    const collapseBtn = document.createElement("button");
+    collapseBtn.className = "collapse-btn";
+    collapseBtn.type = "button";
+    collapseBtn.innerHTML = `<svg width="20" height="12" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 12,2 22,12"/></svg>`;
+    collapseBtn.title = "Collapse/Expand existing assets";
+    
+    collapseBtn.addEventListener("click", () => {
+      card.classList.toggle("collapsed");
+    });
+    
+    card.appendChild(collapseBtn);
+    
     return card;
   }
 
