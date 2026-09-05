@@ -18,6 +18,7 @@ const shareBtn = document.getElementById("share-btn");
 const shareModal = document.getElementById("share-modal");
 const sharePreviewImg = document.getElementById("share-preview-img");
 const downloadShareBtn = document.getElementById("download-share-btn");
+const otherShareBtn = document.getElementById("other-share-btn");
 const settingsBtn = document.getElementById("settings-btn");
 const settingsPanel = document.getElementById("settings-panel");
 const musicSelect = document.getElementById("music-select");
@@ -874,6 +875,31 @@ shareBtn.addEventListener("click", async () => {
     sharePreviewImg.src = dataUrl;
     downloadShareBtn.href = dataUrl;
     shareModal.classList.remove("hidden");
+});
+otherShareBtn.addEventListener("click", async () => {
+    if (!sharePreviewImg.src)
+        return;
+    const roundNum = bestRound > 0 ? bestRound : round;
+    const siteUrl = window.PUBLIC_URL || "https://memorycarnival.com";
+    const text = `Check out ${siteUrl} , I reached Round ${roundNum}. Do you think you can beat me?`;
+    try {
+        const res = await fetch(sharePreviewImg.src);
+        const blob = await res.blob();
+        const file = new File([blob], "memory-carnival-score.png", { type: blob.type });
+        if (navigator.share) {
+            await navigator.share({
+                title: "Memory Carnival Score",
+                text: text,
+                files: [file]
+            });
+        }
+        else {
+            alert("Sharing is not supported on this browser.");
+        }
+    }
+    catch (e) {
+        console.error("Error sharing:", e);
+    }
 });
 loadMedia();
 loadLeaderboard();
