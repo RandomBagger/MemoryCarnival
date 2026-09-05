@@ -38,7 +38,9 @@
     music: "🎵 Music",
   };
 
+  const navBar = document.getElementById("admin-nav") as HTMLElement;
   const main = document.getElementById("admin-main") as HTMLElement;
+  const expandedFolders = new Set<string>();
   const statusBar = document.getElementById("admin-status") as HTMLDivElement;
   const modal = document.getElementById("preview-modal") as HTMLDivElement;
   const modalTitle = document.getElementById("preview-title") as HTMLHeadingElement;
@@ -264,7 +266,10 @@
 
   function buildFolder(folder: string, data: FolderData): HTMLElement {
     const card = document.createElement("section");
-    card.className = "folder-card collapsed";
+    card.className = "folder-card";
+    if (!expandedFolders.has(folder)) {
+      card.classList.add("collapsed");
+    }
 
     const head = document.createElement("div");
     head.className = "folder-head";
@@ -332,6 +337,11 @@
     
     collapseBtn.addEventListener("click", () => {
       card.classList.toggle("collapsed");
+      if (card.classList.contains("collapsed")) {
+        expandedFolders.delete(folder);
+      } else {
+        expandedFolders.add(folder);
+      }
     });
     
     card.appendChild(collapseBtn);

@@ -22,7 +22,9 @@
         videos: "📹 Videos",
         music: "🎵 Music",
     };
+    const navBar = document.getElementById("admin-nav");
     const main = document.getElementById("admin-main");
+    const expandedFolders = new Set();
     const statusBar = document.getElementById("admin-status");
     const modal = document.getElementById("preview-modal");
     const modalTitle = document.getElementById("preview-title");
@@ -228,7 +230,10 @@
     function buildFolder(folder, data) {
         var _a;
         const card = document.createElement("section");
-        card.className = "folder-card collapsed";
+        card.className = "folder-card";
+        if (!expandedFolders.has(folder)) {
+            card.classList.add("collapsed");
+        }
         const head = document.createElement("div");
         head.className = "folder-head";
         const title = document.createElement("h2");
@@ -286,6 +291,12 @@
         collapseBtn.title = "Collapse/Expand existing assets";
         collapseBtn.addEventListener("click", () => {
             card.classList.toggle("collapsed");
+            if (card.classList.contains("collapsed")) {
+                expandedFolders.delete(folder);
+            }
+            else {
+                expandedFolders.add(folder);
+            }
         });
         card.appendChild(collapseBtn);
         return card;

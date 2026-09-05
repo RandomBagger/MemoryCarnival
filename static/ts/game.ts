@@ -736,7 +736,13 @@ const VOLUME_KEY = "mc-music-volume";
 
 async function loadMusic(): Promise<void> {
   const res = await fetch("/api/music");
-  const tracks: Track[] = await res.json();
+  let tracks: Track[] = await res.json();
+
+  // Shuffle tracks
+  for (let i = tracks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+  }
 
   tracks.forEach((track) => {
     const opt = document.createElement("option");
@@ -751,12 +757,10 @@ async function loadMusic(): Promise<void> {
   musicVolume.value = savedVolume ?? "50";
   bgMusic.volume = Number(musicVolume.value) / 100;
 
-  // Restore the previous pick if that file is still on disk. Playback itself
-  // waits for a user gesture — browsers block autoplay otherwise.
-  const savedTrack = localStorage.getItem(MUSIC_KEY);
-  if (savedTrack && tracks.some((t) => t.url === savedTrack)) {
-    musicSelect.value = savedTrack;
-    bgMusic.src = savedTrack;
+  if (tracks.length > 0) {
+    const randomTrack = tracks[0].url;
+    musicSelect.value = randomTrack;
+    bgMusic.src = randomTrack;
   }
 }
 
