@@ -821,3 +821,84 @@ body.mobile.playing .side-panel {
   pointer-events: none;
   white-space: pre;
 }
+
+/* ---------------------------------------------------------------- *
+ * Share Modal
+ * ---------------------------------------------------------------- */
+
+.share-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.share-modal.hidden {
+  display: none;
+}
+
+.share-modal-content {
+  background: var(--bg-card);
+  border: var(--border-size) solid var(--fg-card);
+  border-radius: var(--border-radius);
+  padding: var(--space-l);
+  max-width: 90vw;
+  width: 400px;
+  position: relative;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.share-modal-content h3 {
+  margin-top: 0;
+  color: var(--primary);
+}
+
+.close-share-btn {
+  position: absolute;
+  top: var(--space-s);
+  right: var(--space-s);
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--fg-card);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-share-btn:hover {
+  color: var(--primary);
+}
+
+#share-preview-container {
+  margin: var(--space-m) 0;
+  background: #000;
+  border-radius: calc(var(--border-radius) / 2);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+#share-preview-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.share-instructions {
+  font-size: 0.9rem;
+  color: var(--fg-card);
+  opacity: 0.8;
+  margin-bottom: var(--space-l);
+}
+
+#download-share-btn {
+  display: block;
+  text-decoration: none;
+  width: 100%;
+}

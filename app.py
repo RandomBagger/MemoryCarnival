@@ -114,7 +114,7 @@ init_db()
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", public_url=os.environ.get("PUBLIC_URL", "http://localhost:5000"))
 
 
 @app.route("/assets/<folder>/<path:filename>")

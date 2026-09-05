@@ -19,6 +19,11 @@ const grid = document.getElementById("grid") as HTMLDivElement;
 const finalRound = document.getElementById("final-round") as HTMLSpanElement;
 const leaderboardList = document.getElementById("leaderboard-list") as HTMLOListElement;
 const confettiLayer = document.getElementById("confetti-layer") as HTMLDivElement;
+const shareBtn = document.getElementById("share-btn") as HTMLButtonElement;
+const shareModal = document.getElementById("share-modal") as HTMLDivElement;
+const closeShareBtn = document.getElementById("close-share-btn") as HTMLButtonElement;
+const sharePreviewImg = document.getElementById("share-preview-img") as HTMLImageElement;
+const downloadShareBtn = document.getElementById("download-share-btn") as HTMLAnchorElement;
 const settingsBtn = document.getElementById("settings-btn") as HTMLButtonElement;
 const settingsPanel = document.getElementById("settings-panel") as HTMLDivElement;
 const musicSelect = document.getElementById("music-select") as HTMLSelectElement;
@@ -27,6 +32,12 @@ const musicEmpty = document.getElementById("music-empty") as HTMLParagraphElemen
 const bgMusic = document.getElementById("bg-music") as HTMLAudioElement;
 const aboutTitle = document.getElementById("about-title") as HTMLHeadingElement;
 const aboutBody = document.getElementById("about-body") as HTMLDivElement;
+
+let lastWrongItem: MediaItem | null = null;
+
+interface Window {
+  PUBLIC_URL?: string;
+}
 
 /* ------------------------------------------------------------------ *
  * Layout mode — decided once, at load, and never re-evaluated. Flipping
@@ -523,7 +534,10 @@ function revealResult(): void {
   selections.forEach((sel, i) => {
     const isRight = sel.item.id === sequence[i].id;
     sel.badge.classList.add(isRight ? "right" : "wrong");
-    if (!isRight) allCorrect = false;
+    if (!isRight) {
+      allCorrect = false;
+      lastWrongItem = sel.item;
+    }
   });
 
   if (allCorrect) {
@@ -889,6 +903,108 @@ function installDebug(): void {
 }
 
 if (DEBUG) installDebug();
+
+closeShareBtn.addEventListener("click", () => {
+  shareModal.classList.add("hidden");
+});
+
+shareBtn.addEventListener("click", async () => {
+  if (!lastWrongItem) return;
+  
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  
+  canvas.width = 1080;
+  canvas.height = 1920;
+  
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#ffb6c1");
+  gradient.addColorStop(0.5, "#ff69b4");
+  gradient.addColorStop(1, "#c71585");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  ctx.beginPath();
+  for (let i = -canvas.height; i < canvas.width * 2; i += 100) {
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i - canvas.height, canvas.height);
+  }
+  ctx.lineWidth = 50;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+  ctx.stroke();
+  ctx.restore();
+  
+  ctx.fillStyle = "white";
+  ctx.font = "bold 80px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("🎪 Memory Carnival 🎡", canvas.width / 2, 250);
+  
+  ctx.font = "bold 60px sans-serif";
+  ctx.fillText("I slipped up on this act!", canvas.width / 2, 350);
+  
+  try {
+    if (lastWrongItem.type === "image" || lastWrongItem.type === "gif") {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = lastWrongItem.url;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      const maxImgWidth = 800;
+      const maxImgHeight = 800;
+      let imgWidth = img.width;
+      let imgHeight = img.height;
+      const ratio = Math.min(maxImgWidth / imgWidth, maxImgHeight / imgHeight);
+      imgWidth *= ratio;
+      imgHeight *= ratio;
+      
+      const imgX = (canvas.width - imgWidth) / 2;
+      const imgY = 450;
+      
+      ctx.fillStyle = "white";
+      ctx.fillRect(imgX - 20, imgY - 20, imgWidth + 40, imgHeight + 40);
+      ctx.drawImage(img, imgX, imgY, imgWidth, imgHeight);
+    } else if (lastWrongItem.type === "video") {
+       ctx.fillStyle = "white";
+       ctx.fillRect(140, 450, 800, 800);
+       ctx.fillStyle = "black";
+       ctx.font = "bold 50px sans-serif";
+       ctx.fillText("🎥 Video Act", canvas.width / 2, 850);
+    }
+  } catch (e) {
+    console.error("Failed to draw image to canvas", e);
+  }
+  
+  const roundNum = bestRound > 0 ? bestRound : round;
+  ctx.fillStyle = "white";
+  ctx.font = "bold 70px sans-serif";
+  ctx.fillText(`Round Reached: ${roundNum}`, canvas.width / 2, 1400);
+  
+  const name = playerNameInput.value.trim();
+  if (name) {
+    ctx.font = "bold 60px sans-serif";
+    ctx.fillText(`Player: ${name}`, canvas.width / 2, 1500);
+  }
+  
+  const siteUrl = window.PUBLIC_URL || "https://memorycarnival.com";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fillRect(0, 1700, canvas.width, 220);
+  
+  ctx.fillStyle = "white";
+  ctx.font = "bold 50px sans-serif";
+  ctx.fillText("Play now at:", canvas.width / 2, 1780);
+  ctx.fillStyle = "#ffebcd";
+  ctx.fillText(siteUrl, canvas.width / 2, 1850);
+  
+  const dataUrl = canvas.toDataURL("image/png");
+  sharePreviewImg.src = dataUrl;
+  downloadShareBtn.href = dataUrl;
+  shareModal.classList.remove("hidden");
+});
 
 loadMedia();
 loadLeaderboard();

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎪 Memory Carnival</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <script>
+    window.PUBLIC_URL = "{{ public_url }}";
+  </script>
 </head>
 <body>
   <div id="confetti-layer" class="confetti-layer"></div>
@@ -82,6 +85,18 @@
       <h3>🏆 High Rollers</h3>
       <ol id="leaderboard-list"></ol>
     </aside>
+    </div>
+  </div>
+
+  <div id="share-modal" class="share-modal hidden">
+    <div class="share-modal-content">
+      <button id="close-share-btn" class="close-share-btn" type="button" aria-label="Close">✖</button>
+      <h3>Share your score!</h3>
+      <div id="share-preview-container">
+        <img id="share-preview-img" alt="Share preview" />
+      </div>
+      <p class="share-instructions">Long-press or right-click the image to save/copy it, or click the button below to download.</p>
+      <a id="download-share-btn" class="btn btn-primary" download="memory-carnival-score.png">Download Image</a>
     </div>
   </div>
 
